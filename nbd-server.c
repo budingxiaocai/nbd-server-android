@@ -285,7 +285,7 @@ static int send_option_reply(int sock,
         uint32_t length;
     } __attribute__((packed)) rep;
 
-    rep.magic = htonll_u64(0x3e889045565aULL);
+    rep.magic = htonll_u64(0x3e889045565a9ULL);
     rep.option = htonl(option);
     rep.reply_type = htonl(type);
     rep.length = htonl(len);
