@@ -1,0 +1,95 @@
+name: Build Android ARMv7
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NDK_VERSION: "30.0.16248370"
+  ANDROID_API: "21"
+
+jobs:
+  build-armv7:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      - name: Install Android NDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sdkmanager "ndk;${NDK_VERSION}"
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          NDK="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
+          TOOLCHAIN="${NDK}/toolchains/llvm/prebuilt/linux-x86_64"
+          CLANG="${TOOLCHAIN}/bin/clang"
+          SYSROOT="${TOOLCHAIN}/sysroot"
+
+          "${CLANG}" \
+            --target=armv7a-linux-androideabi${ANDROID_API} \
+            --sysroot="${SYSROOT}" \
+            -march=armv7-a \
+            -mfloat-abi=softfp \
+            -mfpu=vfpv3-d16 \
+            -Oz \
+            -ffunction-sections \
+            -fdata-sections \
+            -fno-ident \
+            -D_FILE_OFFSET_BITS=64 \
+            -DNDEBUG \
+            -Wall \
+            -Wextra \
+            -Wno-unused-parameter \
+            -fPIE \
+            -pie \
+            -Wl,--gc-sections \
+            -Wl,--no-rosegment \
+            -s \
+            -o nbd-server-android-armv7 \
+            nbd-server.c
+
+          file nbd-server-android-armv7
+          readelf -h nbd-server-android-armv7
+          readelf -d nbd-server-android-armv7 || true
+          ls -lh nbd-server-android-armv7
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p dist
+          cp nbd-server-android-armv7 dist/
+          cp README.md dist/
+          tar -czf android-nbd-server-armv7.tar.gz -C dist .
+          sha256sum android-nbd-server-armv7.tar.gz nbd-server-android-armv7 > SHA256SUMS
+
+      - name: Upload ARMv7 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-nbd-server-armv7
+          path: |
+            nbd-server-android-armv7
+            android-nbd-server-armv7.tar.gz
+            SHA256SUMS
